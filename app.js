@@ -4,7 +4,10 @@ const express = require("express");
 const bodyParser = require("body-parser");
 const mongoose = require("mongoose");
 const ejs = require("ejs");
-const encryption = require("mongoose-encryption");
+// const encryption = require("mongoose-encryption");
+// const md5 = require("md5");
+const bCrypt = require("bcrypt");
+const saltrounds = 10;
 
 const app = express();
 app.set('view engine','ejs');
@@ -18,10 +21,8 @@ const userSchema = new mongoose.Schema({
   user : String,
   password: String
 });
-//string used for encryption
 
-const secret = "SHAOMINE";
-userSchema.plugin(encryption,{secret:process.env.SECRET,encryptedFields:['password']});
+// userSchema.plugin(encryption,{secret:process.env.SECRET,encryptedFields:['password']});
 
 const User = mongoose.model("User",userSchema);
 
@@ -39,37 +40,39 @@ app.get("/register",function(req,res){
 
 app.post("/register",function(req,res){
 
+  bCrypt.hash(req.body.password,saltrounds,function(err,hash){
+    const newUser = new User({
+      user : req.body.username,
+      password : hash
+    });
 
-  const newUser = new User({
-    user : req.body.username,
-    password : req.body.password
-  });
-
-  newUser.save(function(err){
-    if(err){
-      console.log("Error");
-    }else{
-      console.log("Saved");
-      res.render("secrets");
-    }
+    newUser.save(function(err){
+      if(err){
+        console.log("Error");
+      }else{
+        console.log("Saved");
+        res.render("secrets");
+      }
+    });
   });
 });
 
 app.post("/login",function(req,res){
   User.findOne({user:req.body.username},function(err,founduser){
     if(founduser){
-      if(founduser.password === req.body.password){
-        res.render("secrets");
-      }else{
-        console.log("Wrong Pwd");
-        res.redirect("/");
-      }
+      bCrypt.compare(req.body.password,founduser.password,function(err,result){
+        if(result === true){
+          res.render("secrets");
+        }else{
+          console.log("Wrong Pwd");
+          res.redirect("/");
+        }
+      });
     }else{
       console.log("Error");
     }
   });
 });
-
 
 let port = process.env.PORT;
 if(port == "" || port == null){
